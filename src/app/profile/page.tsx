@@ -15,6 +15,7 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user, profile, loading, refreshProfile } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -27,6 +28,7 @@ export default function ProfilePage() {
     if (!user) return;
     const formData = new FormData(event.currentTarget);
     setSaving(true);
+    setUploadProgress(null);
     setError(null);
     setSuccess(null);
 
@@ -47,18 +49,21 @@ export default function ProfilePage() {
   async function handlePhoto(file?: File) {
     if (!file || !user) return;
     setSaving(true);
+    setUploadProgress(0);
     setError(null);
     setSuccess(null);
 
     try {
-      const photoURL = await uploadProfileImage(user.uid, file);
+      const photoURL = await uploadProfileImage(user.uid, file, setUploadProgress);
       await updateUserProfile(user.uid, { photoURL });
       await refreshProfile();
       setSuccess('Profile photo updated.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       setError(getFirebaseErrorMessage(err, 'Unable to upload profile photo.'));
     } finally {
       setSaving(false);
+      setUploadProgress(null);
     }
   }
 
@@ -74,7 +79,12 @@ export default function ProfilePage() {
           <h1 className="text-3xl font-black text-slate-900">Profile</h1>
           <p className="mt-2 text-slate-500">Update your display name, status, and profile image.</p>
           <div className="mt-8 flex flex-col items-center">
-            <button onClick={() => fileInputRef.current?.click()} className="group relative grid size-32 place-items-center overflow-hidden rounded-full bg-varta-100 text-varta-700">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={saving}
+              className="group relative grid size-32 place-items-center overflow-hidden rounded-full bg-varta-100 text-varta-700 disabled:cursor-not-allowed disabled:opacity-70"
+            >
               <SafeFirebaseImage
                 src={profile.photoURL}
                 alt={profile.displayName}
@@ -87,8 +97,26 @@ export default function ProfilePage() {
                 <Camera />
               </span>
             </button>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handlePhoto(event.target.files?.[0])} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+              className="hidden"
+              disabled={saving}
+              onChange={(event) => handlePhoto(event.target.files?.[0])}
+            />
           </div>
+          {uploadProgress !== null ? (
+            <div className="mt-6 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
+              <div className="mb-2 flex items-center justify-between">
+                <span>Uploading profile photo...</span>
+                <span className="font-bold text-varta-700">{uploadProgress}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-varta-600 transition-all" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            </div>
+          ) : null}
           {error ? <p className="mt-6 rounded-2xl bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
           {success ? <p className="mt-6 rounded-2xl bg-varta-50 p-3 text-sm text-varta-700">{success}</p> : null}
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">

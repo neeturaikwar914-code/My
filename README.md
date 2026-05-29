@@ -34,7 +34,7 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-KJFMFTL8YS
 
 Realtime listeners are implemented for users, chats, and messages. User listeners only surface canonical user documents whose document ID matches the Firebase Auth UID, so legacy duplicate documents are ignored in the UI.
 
-Image rendering is restricted to trusted Firebase Storage URLs. Malformed URLs, external hosts, and non-project Storage URLs are rejected before they reach `next/image`, and invalid images render a safe fallback.
+Image uploads use resumable Firebase Storage tasks, validate renderable image types (JPG, PNG, WebP, GIF, AVIF), enforce a 5 MB limit, and return Firebase download URLs. Image rendering is restricted to trusted Firebase Storage URLs. Malformed URLs, external hosts, and non-project Storage URLs are rejected before they reach `next/image`, and invalid images render a safe fallback.
 
 ## Security rules
 

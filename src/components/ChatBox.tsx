@@ -18,6 +18,7 @@ type ChatBoxProps = {
 export default function ChatBox({ chat, currentUser }: ChatBoxProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { messages, loading: messagesLoading, error: messagesError } = useMessages(chat?.id);
@@ -34,6 +35,7 @@ export default function ChatBox({ chat, currentUser }: ChatBoxProps) {
     if (!chat || !currentUser || !text.trim()) return;
 
     setSending(true);
+    setUploadProgress(null);
     setError(null);
 
     try {
@@ -50,15 +52,18 @@ export default function ChatBox({ chat, currentUser }: ChatBoxProps) {
     if (!file || !chat || !currentUser) return;
 
     setSending(true);
+    setUploadProgress(0);
     setError(null);
 
     try {
-      const imageUrl = await uploadChatImage(chat.id, currentUser.uid, file);
+      const imageUrl = await uploadChatImage(chat.id, currentUser.uid, file, setUploadProgress);
       await sendMessage(chat.id, currentUser.uid, { imageUrl });
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       setError(getFirebaseErrorMessage(err, 'Unable to share image.'));
     } finally {
       setSending(false);
+      setUploadProgress(null);
     }
   }
 
@@ -101,19 +106,32 @@ export default function ChatBox({ chat, currentUser }: ChatBoxProps) {
           <MessageBubble key={message.id} message={message} isOwn={message.senderId === currentUser?.uid} />
         ))}
       </div>
+      {uploadProgress !== null ? (
+        <div className="mx-3 mb-2 rounded-2xl bg-white/90 p-3 text-sm text-slate-600 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <span>Uploading image...</span>
+            <span className="font-bold text-varta-700">{uploadProgress}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full rounded-full bg-varta-600 transition-all" style={{ width: `${uploadProgress}%` }} />
+          </div>
+        </div>
+      ) : null}
       {error ? <p className="mx-3 mb-2 rounded-2xl bg-red-50 p-3 text-sm text-red-600">{error}</p> : null}
       <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 p-3">
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
           className="hidden"
+          disabled={sending}
           onChange={(event) => handleImageUpload(event.target.files?.[0])}
         />
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="grid size-11 place-items-center rounded-full text-slate-500 hover:bg-slate-200"
+          disabled={sending}
+          className="grid size-11 place-items-center rounded-full text-slate-500 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Share image"
         >
           <ImagePlus size={22} />
@@ -122,7 +140,8 @@ export default function ChatBox({ chat, currentUser }: ChatBoxProps) {
           value={text}
           onChange={(event) => setText(event.target.value)}
           className="min-w-0 flex-1 rounded-full border-0 bg-white px-5 py-3 shadow-sm focus:ring-2 focus:ring-varta-500"
-          placeholder="Type a message"
+          placeholder={sending ? 'Please wait...' : 'Type a message'}
+          disabled={sending}
         />
         <button
           disabled={sending || !text.trim()}
