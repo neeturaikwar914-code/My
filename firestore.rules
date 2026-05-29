@@ -16,18 +16,31 @@ service cloud.firestore {
         && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
     }
 
+    function isTrustedStorageUrl(url) {
+      return url == ''
+        || url.matches('https://firebasestorage[.]googleapis[.]com/v0/b/(varta-2f722[.]firebasestorage[.]app|varta-2f722[.]appspot[.]com)/o/.*')
+        || url.matches('https://varta-2f722[.]firebasestorage[.]app/.*');
+    }
+
+    function chatParticipantPhotosTrusted(data) {
+      return isTrustedStorageUrl(data.participantProfiles[data.participants[0]].photoURL)
+        && isTrustedStorageUrl(data.participantProfiles[data.participants[1]].photoURL);
+    }
+
     match /users/{uid} {
       allow read: if signedIn();
       allow create: if isUser(uid)
         && request.resource.data.uid == uid
         && request.resource.data.keys().hasOnly([
           'uid', 'displayName', 'email', 'photoURL', 'about', 'createdAt', 'updatedAt', 'lastSeen'
-        ]);
+        ])
+        && isTrustedStorageUrl(request.resource.data.photoURL);
       allow update: if isUser(uid)
         && request.resource.data.uid == uid
         && request.resource.data.keys().hasOnly([
           'uid', 'displayName', 'email', 'photoURL', 'about', 'createdAt', 'updatedAt', 'lastSeen'
-        ]);
+        ])
+        && isTrustedStorageUrl(request.resource.data.photoURL);
       allow delete: if false;
     }
 
@@ -38,12 +51,14 @@ service cloud.firestore {
         && request.resource.data.participants.size() == 2
         && request.resource.data.keys().hasOnly([
           'participants', 'participantProfiles', 'lastMessage', 'lastMessageAt', 'createdAt'
-        ]);
+        ])
+        && chatParticipantPhotosTrusted(request.resource.data);
       allow update: if isChatParticipant(chatId)
         && request.resource.data.participants == resource.data.participants
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'participantProfiles', 'lastMessage', 'lastMessageAt'
-        ]);
+        ])
+        && chatParticipantPhotosTrusted(request.resource.data);
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -52,7 +67,8 @@ service cloud.firestore {
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.keys().hasOnly([
             'senderId', 'text', 'imageUrl', 'status', 'createdAt'
-          ]);
+          ])
+          && isTrustedStorageUrl(request.resource.data.imageUrl);
         allow update, delete: if false;
       }
     }

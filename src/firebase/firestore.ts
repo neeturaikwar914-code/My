@@ -14,6 +14,7 @@ import {
 import type { User as FirebaseUser } from 'firebase/auth';
 import { db } from './firebase';
 import type { Chat, Message, UserProfile } from '@/types';
+import { getTrustedFirebaseStorageImageUrl } from '@/utils/imageUrls';
 
 const usersRef = collection(db, 'users');
 const chatsRef = collection(db, 'chats');
@@ -33,7 +34,7 @@ export async function createUserProfile(
     uid: user.uid,
     displayName: data.displayName || user.displayName || user.email?.split('@')[0] || 'Varta user',
     email: user.email || '',
-    photoURL: data.photoURL ?? user.photoURL ?? '',
+    photoURL: getTrustedFirebaseStorageImageUrl(data.photoURL ?? user.photoURL) || '',
     about: data.about || existingUser.data()?.about || 'Available'
   };
 
@@ -52,8 +53,14 @@ export async function createUserProfile(
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {
+  const nextData = { ...data };
+
+  if ('photoURL' in nextData) {
+    nextData.photoURL = nextData.photoURL ? getTrustedFirebaseStorageImageUrl(nextData.photoURL) || '' : '';
+  }
+
   await updateDoc(doc(usersRef, uid), {
-    ...data,
+    ...nextData,
     updatedAt: serverTimestamp()
   });
 }
@@ -95,12 +102,12 @@ export async function createChat(currentUser: UserProfile, otherUser: UserProfil
         [currentUser.uid]: {
           displayName: currentUser.displayName,
           email: currentUser.email,
-          photoURL: currentUser.photoURL || ''
+          photoURL: getTrustedFirebaseStorageImageUrl(currentUser.photoURL) || ''
         },
         [otherUser.uid]: {
           displayName: otherUser.displayName,
           email: otherUser.email,
-          photoURL: otherUser.photoURL || ''
+          photoURL: getTrustedFirebaseStorageImageUrl(otherUser.photoURL) || ''
         }
       },
       lastMessage: 'Chat started',
@@ -144,12 +151,18 @@ export function subscribeToMessages(chatId: string, callback: (messages: Message
 
 export async function sendMessage(chatId: string, senderId: string, payload: Pick<Message, 'text' | 'imageUrl'>) {
   const messagesRef = collection(db, 'chats', chatId, 'messages');
-  const preview = payload.text || (payload.imageUrl ? '📷 Photo' : 'Message');
+  const safeImageUrl = payload.imageUrl ? getTrustedFirebaseStorageImageUrl(payload.imageUrl) : '';
+
+  if (payload.imageUrl && !safeImageUrl) {
+    throw new Error('Only trusted Firebase Storage image URLs can be shared.');
+  }
+
+  const preview = payload.text || (safeImageUrl ? '📷 Photo' : 'Message');
 
   await addDoc(messagesRef, {
     senderId,
     text: payload.text || '',
-    imageUrl: payload.imageUrl || '',
+    imageUrl: safeImageUrl || '',
     status: 'sent',
     createdAt: serverTimestamp()
   });

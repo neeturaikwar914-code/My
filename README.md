@@ -34,6 +34,8 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-KJFMFTL8YS
 
 Realtime listeners are implemented for users, chats, and messages.
 
+Image rendering is restricted to trusted Firebase Storage URLs. Malformed URLs, external hosts, and non-project Storage URLs are rejected before they reach `next/image`, and invalid images render a safe fallback.
+
 ## Security rules
 
 Production-oriented starter rules are included in:

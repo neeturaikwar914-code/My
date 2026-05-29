@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useChats, useUsers } from '@/hooks/useChats';
 import type { Chat, UserProfile } from '@/types';
 import { getFirebaseErrorMessage } from '@/utils/firebaseErrors';
+import { getTrustedFirebaseStorageImageUrl } from '@/utils/imageUrls';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -40,8 +41,16 @@ export default function ChatPage() {
         id: chatId,
         participants: [profile.uid, otherUser.uid].sort(),
         participantProfiles: {
-          [profile.uid]: { displayName: profile.displayName, email: profile.email, photoURL: profile.photoURL || '' },
-          [otherUser.uid]: { displayName: otherUser.displayName, email: otherUser.email, photoURL: otherUser.photoURL || '' }
+          [profile.uid]: {
+            displayName: profile.displayName,
+            email: profile.email,
+            photoURL: getTrustedFirebaseStorageImageUrl(profile.photoURL) || ''
+          },
+          [otherUser.uid]: {
+            displayName: otherUser.displayName,
+            email: otherUser.email,
+            photoURL: getTrustedFirebaseStorageImageUrl(otherUser.photoURL) || ''
+          }
         }
       });
     } catch (err) {

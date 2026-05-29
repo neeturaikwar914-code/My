@@ -1,7 +1,7 @@
-import Image from 'next/image';
 import { CheckCheck } from 'lucide-react';
 import type { Message } from '@/types';
 import { formatChatTime } from '@/utils/date';
+import SafeFirebaseImage from './SafeFirebaseImage';
 
 type MessageBubbleProps = {
   message: Message;
@@ -18,7 +18,14 @@ export default function MessageBubble({ message, isOwn }: MessageBubbleProps) {
       >
         {message.imageUrl ? (
           <div className="relative mb-2 h-52 w-60 overflow-hidden rounded-xl bg-slate-100">
-            <Image src={message.imageUrl} alt="Shared chat image" fill className="object-cover" sizes="240px" />
+            <SafeFirebaseImage
+              src={message.imageUrl}
+              alt="Shared chat image"
+              fill
+              className="object-cover"
+              sizes="240px"
+              fallback={<div className="grid h-full w-full place-items-center px-4 text-center text-xs text-slate-500">Image unavailable</div>}
+            />
           </div>
         ) : null}
         {message.text ? <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-900">{message.text}</p> : null}

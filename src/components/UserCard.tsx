@@ -1,6 +1,6 @@
-import Image from 'next/image';
 import { UserRound } from 'lucide-react';
 import type { UserProfile } from '@/types';
+import SafeFirebaseImage from './SafeFirebaseImage';
 
 type UserCardProps = {
   user: UserProfile;
@@ -18,11 +18,14 @@ export default function UserCard({ user, subtitle, onClick, active }: UserCardPr
       }`}
     >
       <span className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-varta-100 text-varta-700">
-        {user.photoURL ? (
-          <Image src={user.photoURL} alt={user.displayName} fill className="object-cover" sizes="48px" />
-        ) : (
-          <UserRound size={22} />
-        )}
+        <SafeFirebaseImage
+          src={user.photoURL}
+          alt={user.displayName}
+          fill
+          className="object-cover"
+          sizes="48px"
+          fallback={<UserRound size={22} />}
+        />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-bold text-slate-900">{user.displayName}</span>

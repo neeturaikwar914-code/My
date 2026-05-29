@@ -1,10 +1,10 @@
 'use client';
 
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Camera, UserRound } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import SafeFirebaseImage from '@/components/SafeFirebaseImage';
 import { updateUserProfile } from '@/firebase/firestore';
 import { uploadProfileImage } from '@/firebase/storage';
 import { useAuth } from '@/hooks/useAuth';
@@ -75,7 +75,14 @@ export default function ProfilePage() {
           <p className="mt-2 text-slate-500">Update your display name, status, and profile image.</p>
           <div className="mt-8 flex flex-col items-center">
             <button onClick={() => fileInputRef.current?.click()} className="group relative grid size-32 place-items-center overflow-hidden rounded-full bg-varta-100 text-varta-700">
-              {profile.photoURL ? <Image src={profile.photoURL} alt={profile.displayName} fill className="object-cover" sizes="128px" /> : <UserRound size={42} />}
+              <SafeFirebaseImage
+                src={profile.photoURL}
+                alt={profile.displayName}
+                fill
+                className="object-cover"
+                sizes="128px"
+                fallback={<UserRound size={42} />}
+              />
               <span className="absolute inset-0 grid place-items-center bg-slate-950/45 text-white opacity-0 transition group-hover:opacity-100">
                 <Camera />
               </span>
