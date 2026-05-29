@@ -28,11 +28,11 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-KJFMFTL8YS
 
 ## Firestore data model
 
-- `users/{uid}` stores profile records and presence metadata.
+- `users/{uid}` stores one canonical profile record per Firebase Auth UID and presence metadata.
 - `chats/{chatId}` stores participants, denormalized participant previews, and last-message metadata.
 - `chats/{chatId}/messages/{messageId}` stores text and image messages.
 
-Realtime listeners are implemented for users, chats, and messages.
+Realtime listeners are implemented for users, chats, and messages. User listeners only surface canonical user documents whose document ID matches the Firebase Auth UID, so legacy duplicate documents are ignored in the UI.
 
 Image rendering is restricted to trusted Firebase Storage URLs. Malformed URLs, external hosts, and non-project Storage URLs are rejected before they reach `next/image`, and invalid images render a safe fallback.
 

@@ -5,6 +5,7 @@ import {
   getDoc,
   onSnapshot,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -28,28 +29,56 @@ export async function createUserProfile(
   data: Partial<Pick<UserProfile, 'displayName' | 'about' | 'photoURL'>> = {}
 ) {
   const userDoc = doc(usersRef, user.uid);
-  const existingUser = await getDoc(userDoc);
-  const now = serverTimestamp();
-  const profile: Omit<UserProfile, 'createdAt' | 'updatedAt' | 'lastSeen'> = {
-    uid: user.uid,
-    displayName: data.displayName || user.displayName || user.email?.split('@')[0] || 'Varta user',
-    email: user.email || '',
-    photoURL: getTrustedFirebaseStorageImageUrl(data.photoURL ?? user.photoURL) || '',
-    about: data.about || existingUser.data()?.about || 'Available'
-  };
+  const safePhotoURL = getTrustedFirebaseStorageImageUrl(data.photoURL ?? user.photoURL) || '';
+  const displayName = data.displayName || user.displayName || user.email?.split('@')[0] || 'Varta user';
+  const email = user.email || '';
 
-  await setDoc(
-    userDoc,
-    {
-      ...profile,
-      createdAt: existingUser.exists() ? existingUser.data().createdAt : now,
-      updatedAt: now,
-      lastSeen: now
-    },
-    { merge: true }
-  );
+  return runTransaction(db, async (transaction) => {
+    const existingUser = await transaction.get(userDoc);
+    const now = serverTimestamp();
 
-  return { ...profile, createdAt: existingUser.data()?.createdAt, updatedAt: undefined } as UserProfile;
+    if (existingUser.exists()) {
+      const existingProfile = existingUser.data() as UserProfile;
+      const updates: Partial<UserProfile> = {
+        uid: user.uid,
+        displayName,
+        email,
+        updatedAt: now as UserProfile['updatedAt'],
+        lastSeen: now as UserProfile['lastSeen']
+      };
+
+      if (safePhotoURL) {
+        updates.photoURL = safePhotoURL;
+      }
+
+      if (data.about) {
+        updates.about = data.about;
+      }
+
+      transaction.set(userDoc, updates, { merge: true });
+
+      return {
+        ...existingProfile,
+        ...updates,
+        photoURL: updates.photoURL ?? existingProfile.photoURL ?? '',
+        about: updates.about ?? existingProfile.about ?? 'Available'
+      } as UserProfile;
+    }
+
+    const profile: UserProfile = {
+      uid: user.uid,
+      displayName,
+      email,
+      photoURL: safePhotoURL,
+      about: data.about || 'Available',
+      createdAt: now as UserProfile['createdAt'],
+      updatedAt: now as UserProfile['updatedAt'],
+      lastSeen: now as UserProfile['lastSeen']
+    };
+
+    transaction.set(userDoc, profile);
+    return profile;
+  });
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {
@@ -76,14 +105,28 @@ export async function getUserProfile(uid: string) {
   return snapshot.exists() ? (snapshot.data() as UserProfile) : null;
 }
 
+function uniqueUsersByUid(users: UserProfile[]) {
+  const uniqueUsers = new Map<string, UserProfile>();
+
+  for (const user of users) {
+    if (!user.uid || uniqueUsers.has(user.uid)) continue;
+    uniqueUsers.set(user.uid, user);
+  }
+
+  return Array.from(uniqueUsers.values()).sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
 export function subscribeToUsers(callback: (users: UserProfile[]) => void, onError?: (error: Error) => void): Unsubscribe {
   return onSnapshot(
     query(usersRef),
     (snapshot) => {
       callback(
-        snapshot.docs
-          .map((userDoc) => userDoc.data() as UserProfile)
-          .sort((a, b) => a.displayName.localeCompare(b.displayName))
+        uniqueUsersByUid(
+          snapshot.docs
+            .map((userDoc) => ({ id: userDoc.id, profile: userDoc.data() as UserProfile }))
+            .filter(({ id, profile }) => id === profile.uid)
+            .map(({ profile }) => profile)
+        )
       );
     },
     onError
